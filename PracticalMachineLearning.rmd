@@ -1,0 +1,165 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Yen Lynn"
+date: "January 5, 2016"
+output: html_document
+---
+
+###Overview###
+In this project, there are data capturing from the fitness tracking devices to collect a large amount of data about personal activity. These data are collected from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.There are 2 sets of data, training data and testing data. The focus of this project is to predict the classe identifying the quality of the activity of the participants in test data using the model built in the training data.  
+
+###Loading Importance Packages###
+
+To start, load the required packages
+```{r, warning = FALSE, message = FALSE,results = FALSE }
+library(caret)
+library(lattice)
+library(randomForest)
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+```
+
+###Data Processing###
+
+Load in the training and test datasets.
+```{r}
+Training <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+Testing <- read.csv("pml-testing.csv", na.strings = c("NA", ""))
+```
+
+Summarize the classe in training dataset to group them together and get their count.
+```{r}
+summary(Training$classe)
+```
+
+In the training set,there are five different classes (A,B,C,D,E) that will be used to build the model to predict on our testing set.
+
+Let's start by splitting the training set into 2 (one 60%, another 40%). The 60% dataset is used to build the model while the 40% dataset is used to validate the performance of the d=model.
+```{r}
+set.seed(100) #set seed for reproducibility
+inTrain <- createDataPartition(y=Training$classe, p=0.6, list=F)
+SubTrain <- Training[inTrain, ]
+SubTest <- Training[-inTrain, ]
+```
+
+Checking on the dim for both SubTrain and SubTest
+```{r}
+dim(SubTrain);dim(SubTest)
+```
+
+By looking at the data, some of the variable are near zero variance. 
+Remove the variables with near zero variance.
+```{r}
+NZV <- nearZeroVar(SubTrain)
+SubTrain <- SubTrain[,-NZV]
+SubTest <- SubTest[,-NZV]
+dim(SubTrain); dim(SubTest)
+```
+
+Now remove varaiables that are mostly NA
+```{r}
+nonNATrain <- names(SubTrain[,colSums(is.na(SubTrain)) == 0])
+SubTrain <-SubTrain[,nonNATrain]
+nonNATest <- names(SubTest[,colSums(is.na(SubTest)) == 0])
+SubTest <-SubTest[,nonNATest]
+dim(SubTrain); dim(SubTest)
+```
+
+Let's look at the columns in SubTrain and SubTest.
+```{r, results = 'hide'}
+str(SubTrain); str(SubTest)
+```
+
+There are 59 variables now in the dataset for both SubTrain and SubTest.
+Decide to remove the first 6 variables that are not relevant in building the model.
+```{r}
+SubTrain <- SubTrain[,-c(1,2,3,4,5,6)]
+SubTest <- SubTest[,-c(1,2,3,4,5,6)]
+dim(SubTrain); dim(SubTest)
+```
+
+
+###Building the model###
+####Model 1: Decision Tree####
+First, decision tree algorithm is used to build the model.
+```{r, warning = FALSE}
+# set seed for reproducibility
+set.seed(100) 
+# put in the decision tree algorithm on SubTrain data
+DTAModel <- rpart(classe ~., data=SubTrain, method="class")
+# populate the decision tree model plot using fancyRpartPlot
+fancyRpartPlot(DTAModel)
+```
+
+Validate the decision tree model with the SubTest data and do the confusion matrix.
+```{r}
+# Validate the decision tree model with the SubTest data
+DTAPredictTest <- predict(DTAModel, newdata = SubTest, type ="class")
+# Do the confusion matrix
+DTAmatrix <- confusionMatrix(SubTest$classe, DTAPredictTest)
+DTAmatrix
+```
+
+Let's look at the out of sample error for decision tree model
+```{r}
+DTAoverall <- DTAmatrix$overall
+DTAaccuracy <- DTAoverall[1]
+DTAaccuracy
+DTAOut_of_Sample_Error<- 1 - DTAaccuracy
+DTAOut_of_Sample_Error
+```
+
+For decision tree model,the confusion matrix show that the **accuracy** is **75.1%** and the **out of sample error** is **24.9%**.
+
+
+####Model 2: Random Forest####
+Second, use random forest to build the model.
+```{r,warning = FALSE}
+# set seed for reproducibility
+set.seed(100)
+# put in the random forest algorithm on SubTrain data
+RFModel <- randomForest(classe ~ ., data=SubTrain)
+```
+
+Validate the random forest model with the SubTest data and do the confusion matrix.
+```{r}
+# Validate the random forest model with the SubTest data
+RFPredictTest <- predict(RFModel, newdata = SubTest, type ="class")
+# Do the confusion matrix
+RFmatrix <- confusionMatrix(SubTest$classe, RFPredictTest)
+RFmatrix
+```
+
+Let's look at the out of sample error for random forest model
+```{r}
+RFoverall <- RFmatrix$overall
+RFaccuracy <- RFoverall[1]
+RFaccuracy
+RFOut_of_Sample_Error<- 1 - RFaccuracy
+RFOut_of_Sample_Error
+```
+
+
+As for random forest, the **accuracy** is **99.34%** from the confusion matrix.The **out of sample error** for random forest model is **0.66%**. The accuracy value is way **higher** for **random forest** model compare to the decision tree model. Thus, random forest model will be used to predict the testing dataset.
+
+###Testing the prediction model with testing dataset###
+```{r}
+TestingPredict <- predict(RFModel, newdata=Testing)
+# View the results
+TestingPredict
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
